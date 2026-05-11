@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "patient_name": "Moise",
+    "phone": "03226622545",
+    "day": "2026-04-03",
+    "time": "3:00 PM",
+    "reason": "check-up",
+    "booked_at": "2026-03-29T21:38:25.840768"
+  },
+  {
+    "id": 2,
+    "patient_name": "Moise M O E E Z",
+    "phone": "0322662545",
+    "day": "3 April",
+    "time": "3 p.m.",
+    "reason": "",
+    "booked_at": "2026-03-29T21:45:03.488292"
+  }
+]
