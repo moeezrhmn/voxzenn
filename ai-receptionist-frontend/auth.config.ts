@@ -3,6 +3,7 @@ import type { NextAuthConfig } from "next-auth";
 // Edge-compatible config — no bcrypt, no pg, no Node.js built-ins.
 // Used by middleware for JWT verification only.
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   callbacks: {
