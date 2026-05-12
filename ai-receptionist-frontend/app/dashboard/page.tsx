@@ -1,8 +1,8 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Phone, Calendar, BarChart2, LogOut, ChevronDown, ChevronUp, Settings, Save, PhoneCall, Trash2, Plus } from "lucide-react";
+import { Phone, Calendar, BarChart2, LogOut, ChevronDown, ChevronUp, Settings, Save, PhoneCall, Trash2, Plus, Menu, X } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import CallInterface from "@/components/CallInterface";
 
@@ -56,6 +56,9 @@ function DashboardInner() {
   const [config, setConfig] = useState<Config | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const dataFetchedRef = useRef(false);
 
   const clientId = session?.user?.id ?? null;
   const userEmail = session?.user?.email ?? null;
@@ -70,6 +73,7 @@ function DashboardInner() {
     router.replace(`/dashboard?${params.toString()}`, { scroll: false });
   };
 
+  // Fetch config once when auth is ready.
   useEffect(() => {
     if (status === "loading") return;
     if (status === "unauthenticated") { router.replace("/login"); return; }
@@ -86,7 +90,20 @@ function DashboardInner() {
         try { cfg.faqs = JSON.parse(cfg.faqs || "{}"); } catch { cfg.faqs = {}; }
       }
       setConfig(cfg);
+      setConfigLoaded(true);
+    })();
 
+    return () => { cancelled = true; };
+  }, [status, clientId, router]);
+
+  // Fetch calls + bookings on initial load and whenever a data tab is opened.
+  useEffect(() => {
+    if (!configLoaded || !clientId) return;
+    // Always fetch on first load; on subsequent tab switches only fetch for data tabs.
+    if (dataFetchedRef.current && !["overview", "calls", "bookings"].includes(activeView)) return;
+
+    let cancelled = false;
+    (async () => {
       const [callsRes, bookingsRes] = await Promise.all([
         fetch(`${API}/calls/${clientId}`),
         fetch(`${API}/bookings/${clientId}`),
@@ -95,10 +112,11 @@ function DashboardInner() {
       setCalls(await callsRes.json());
       setBookings(await bookingsRes.json());
       setLoading(false);
+      dataFetchedRef.current = true;
     })();
 
     return () => { cancelled = true; };
-  }, [status, clientId, router]);
+  }, [configLoaded, clientId, activeView]);
 
   const handleSignOut = async () => {
     await signOut({ redirect: false });
@@ -145,11 +163,31 @@ function DashboardInner() {
 
   return (
     <div className="layout">
+      {/* Mobile header — hidden on desktop via CSS */}
+      <header className="mobile-header">
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+          <Phone size={16} color="var(--color-brand)" />
+          <span style={{ fontWeight: "var(--font-bold)", color: "var(--color-text-primary)", letterSpacing: "-0.02em" }}>Voxzenn</span>
+        </div>
+        <button
+          onClick={() => setSidebarOpen(true)}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--color-text-primary)", display: "flex", alignItems: "center", padding: "var(--space-1)" }}
+        >
+          <Menu size={20} />
+        </button>
+      </header>
+
+      {/* Sidebar overlay (mobile) */}
+      <div className={`sidebar-overlay ${sidebarOpen ? "open" : ""}`} onClick={() => setSidebarOpen(false)} />
+
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
         <div style={{ padding: "var(--space-5)", borderBottom: "1px solid var(--color-border)", display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
           <Phone size={16} color="var(--color-brand)" />
           <span style={{ fontWeight: "var(--font-bold)", color: "var(--color-text-primary)", letterSpacing: "-0.02em" }}>Voxzenn</span>
+          <button className="sidebar-close-btn" onClick={() => setSidebarOpen(false)}>
+            <X size={18} />
+          </button>
         </div>
 
         {/* Business badge */}
@@ -172,7 +210,7 @@ function DashboardInner() {
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveView(item.id)}
+              onClick={() => { setActiveView(item.id); setSidebarOpen(false); }}
               className={`nav-item ${activeView === item.id ? "active" : ""}`}
             >
               {item.icon}
@@ -188,7 +226,7 @@ function DashboardInner() {
               {userEmail}
             </div>
           )}
-          <button onClick={handleSignOut} className="nav-item" style={{ color: "var(--color-danger)" }}>
+          <button onClick={() => { setSidebarOpen(false); handleSignOut(); }} className="nav-item" style={{ color: "var(--color-danger)" }}>
             <LogOut size={16} /> Sign out
           </button>
         </div>
@@ -511,6 +549,7 @@ function BookingsTable({ bookings, formatDate }: {
   );
   return (
     <div className="card" style={{ overflow: "hidden" }}>
+      <div className="table-scroll">
       <table className="table">
         <thead><tr>{["Patient", "Phone", "Date", "Time", "Reason", "Booked"].map(h => <th key={h}>{h}</th>)}</tr></thead>
         <tbody>
@@ -526,6 +565,7 @@ function BookingsTable({ bookings, formatDate }: {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
