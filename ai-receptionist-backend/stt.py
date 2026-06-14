@@ -8,13 +8,16 @@ DEEPGRAM_API_KEY = os.getenv("DEEPGRAM_API_KEY")
 DEEPGRAM_URL = "https://api.deepgram.com/v1/listen"
 
 
-async def transcribe_audio(audio_bytes: bytes, last_ai_message: str = "") -> str | None:
+async def transcribe_audio(
+    audio_bytes: bytes,
+    last_ai_message: str = "",
+    content_type: str = "audio/webm",
+) -> str | None:
     """Transcribe audio with Deepgram Nova-3.
 
-    `last_ai_message` is accepted for API compatibility with the previous Whisper
-    implementation but isn't currently passed to Deepgram — Nova-3 is accurate enough
-    on short conversational replies that we rely on its built-in conversational tuning
-    plus keyterm bias for common short responses.
+    `content_type` defaults to "audio/webm" for browser WebSocket calls.
+    Pass "audio/wav" when audio comes from the Twilio adapter (µ-law → WAV conversion).
+    `last_ai_message` is accepted for API compatibility but not currently used.
     """
     if not DEEPGRAM_API_KEY:
         print("[STT] DEEPGRAM_API_KEY not set in .env")
@@ -22,7 +25,7 @@ async def transcribe_audio(audio_bytes: bytes, last_ai_message: str = "") -> str
 
     headers = {
         "Authorization": f"Token {DEEPGRAM_API_KEY}",
-        "Content-Type": "audio/webm",
+        "Content-Type": content_type,
     }
 
     # Repeated query params for keyterm — Nova-3 feature that boosts recognition

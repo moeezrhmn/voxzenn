@@ -1,10 +1,14 @@
+import os
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
-from fastapi import FastAPI, HTTPException, WebSocket
+from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from pydantic import BaseModel
 from ws_handler import handle_session
+from twilio_adapter import handle_twilio_stream, twiml_response
+from telnyx_adapter import handle_telnyx_stream, texml_response
 from database import get_pool, get_config, upsert_config, run_migrations
 
 
@@ -101,3 +105,38 @@ async def upsert_config_endpoint(client_id: str, payload: ConfigPayload):
         "faqs": payload.faqs,
         "assistant_name": payload.assistant_name,
     })
+
+
+# ── Twilio ────────────────────────────────────────────────────────────────────
+
+@app.post("/twilio/voice/{client_id}")
+async def twilio_voice_webhook(client_id: str, request: Request):
+    ws_base = os.getenv("BACKEND_WS_URL", "wss://api-voxzenn.quanter.dev")
+    ws_url = f"{ws_base}/twilio/stream/{client_id}"
+    return Response(content=twiml_response(ws_url), media_type="application/xml")
+
+
+@app.websocket("/twilio/stream/{client_id}")
+async def twilio_stream_endpoint(websocket: WebSocket, client_id: str):
+    await handle_twilio_stream(websocket, client_id)
+
+
+# ── Telnyx ────────────────────────────────────────────────────────────────────
+
+@app.post("/telnyx/voice/{client_id}")
+async def telnyx_voice_webhook(client_id: str, request: Request):
+    ws_base = os.getenv("BACKEND_WS_URL", "wss://api-voxzenn.quanter.dev")
+    ws_url = f"{ws_base}/telnyx/stream/{client_id}"
+    return Response(content=texml_response(ws_url), media_type="application/xml")
+
+
+@app.websocket("/telnyx/stream/{client_id}")
+async def telnyx_stream_endpoint(websocket: WebSocket, client_id: str):
+    await handle_telnyx_stream(websocket, client_id)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8082))
+    debug = os.getenv("DEBUG", "false").lower() == "true"
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=debug)

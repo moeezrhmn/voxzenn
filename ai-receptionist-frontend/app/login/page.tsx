@@ -78,7 +78,6 @@ export default function LoginPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
             {[
               { label: "💇 Glamour Hair Studio", email: "demo-glamour@voxzenn.demo" },
-              { label: "💅 Luxe Nail Bar", email: "demo-luxe@voxzenn.demo" },
             ].map((demo) => (
               <button
                 key={demo.email}
